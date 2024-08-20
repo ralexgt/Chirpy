@@ -3,42 +3,45 @@ package main
 import (
 	"log"
 	"net/http"
+
+	"github.com/ralexgt/Chirpy/internal/database"
 )
 
 type apiConfig struct {
 	fileserverHits int
+	DB             *database.DB
 }
 
 func main() {
-	const filepathToRoot = "."
+	const filepathRoot = "."
 	const port = "8080"
 
-	apiCfg := apiConfig{fileserverHits: 0}
-
-	// middlewareStack := CreateMiddlewareStack(
-	// 	apiCfg.middlewareVisitsInc,
-	// 	middlewareLogging,
-	// )
-
-	router := http.NewServeMux()
-	fileServerHandler := apiCfg.middlewareVisitsAndLog((http.StripPrefix("/app", http.FileServer(http.Dir(filepathToRoot)))))
-
-	// app users routes
-	router.Handle("/app/*", fileServerHandler)
-
-	// admin routes
-	router.Handle("GET /admin/metrics", middlewareLogging(http.HandlerFunc(apiCfg.handlerVisits)))
-
-	// api routes
-	router.Handle("GET /api/healthz", middlewareLogging(http.HandlerFunc(handlerReadiness)))
-	router.Handle("GET /api/reset", middlewareLogging(http.HandlerFunc(apiCfg.handlerReset)))
-	router.Handle("POST /api/validate_chirp", middlewareLogging(http.HandlerFunc(handlerValidate)))
-
-	server := &http.Server{
-		Addr: "127.0.0.1:" + port,
-		Handler: router,
+	db, err := database.NewDB("database.json")
+	if err != nil {
+		log.Fatal(err)
 	}
-	log.Printf("Serving files from %s on port: %s\n", filepathToRoot, port)
-	log.Fatal(server.ListenAndServe())
-}
 
+	apiCfg := apiConfig{
+		fileserverHits: 0,
+		DB:             db,
+	}
+
+	mux := http.NewServeMux()
+	fsHandler := apiCfg.middlewareMetricsInc(http.StripPrefix("/app", http.FileServer(http.Dir(filepathRoot))))
+	mux.Handle("/app/*", fsHandler)
+
+	mux.HandleFunc("GET /api/healthz", handlerReadiness)
+	mux.HandleFunc("GET /api/reset", apiCfg.handlerReset)
+	mux.HandleFunc("POST /api/chirps", apiCfg.handlerChirpsCreate)
+	mux.HandleFunc("GET /api/chirps", apiCfg.handlerChirpsRetrieve)
+
+	mux.HandleFunc("GET /admin/metrics", apiCfg.handlerMetrics)
+
+	srv := &http.Server{
+		Addr:    ":" + port,
+		Handler: mux,
+	}
+
+	log.Printf("Serving files from %s on port: %s\n", filepathRoot, port)
+	log.Fatal(srv.ListenAndServe())
+}
