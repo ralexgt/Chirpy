@@ -9,7 +9,7 @@ import (
 
 type apiConfig struct {
 	fileserverHits int
-	DB             *database.DB
+	DB *database.DB
 }
 
 func main() {
@@ -23,7 +23,7 @@ func main() {
 
 	apiCfg := apiConfig{
 		fileserverHits: 0,
-		DB:             db,
+		DB: db,
 	}
 
 	mux := http.NewServeMux()
@@ -32,13 +32,15 @@ func main() {
 
 	mux.HandleFunc("GET /api/healthz", handlerReadiness)
 	mux.HandleFunc("GET /api/reset", apiCfg.handlerReset)
+	mux.HandleFunc("POST /api/users", apiCfg.handlerUsersCreate)
 	mux.HandleFunc("POST /api/chirps", apiCfg.handlerChirpsCreate)
 	mux.HandleFunc("GET /api/chirps", apiCfg.handlerChirpsRetrieve)
+	mux.HandleFunc("GET /api/chirps/{chirpId}", apiCfg.handlerChirpRetrieveById)
 
 	mux.HandleFunc("GET /admin/metrics", apiCfg.handlerMetrics)
 
 	srv := &http.Server{
-		Addr:    ":" + port,
+		Addr: ":" + port,
 		Handler: mux,
 	}
 
